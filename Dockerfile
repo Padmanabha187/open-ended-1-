@@ -2,7 +2,7 @@ FROM eclipse-temurin:17
 
 WORKDIR /app
 
-COPY target/expense-tracker-1.0.0-jar-with-dependencies.jar app.jar
+COPY target/expense-tracker-1.0.0.jar app.jar
 
 EXPOSE 8080
 
