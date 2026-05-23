@@ -1,186 +1,154 @@
 package com.example.app;
 
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Scanner;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public class App {
 
-    private static final Logger logger =
-            LoggerFactory.getLogger(App.class);
+    static List<String> expenses = new ArrayList<>();
+    static double totalExpense = 0;
 
-    private static final ArrayList<String> expenseList =
-            new ArrayList<>();
+    public static void main(String[] args) throws Exception {
 
-    private static double totalExpense = 0;
+        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
-    public static void main(String[] args) {
+        server.createContext("/", new ExpenseHandler());
 
-        Scanner scanner = new Scanner(System.in);
+        server.setExecutor(null);
 
-        logger.info("Expense Tracker Started");
+        System.out.println("Server started at http://localhost:8080");
 
-        int choice;
+        server.start();
+    }
 
-        System.out.println("======================================");
-        System.out.println("         DAILY EXPENSE TRACKER");
-        System.out.println("======================================");
+    static class ExpenseHandler implements HttpHandler {
 
-        do {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
 
-            displayMenu();
+            String method = exchange.getRequestMethod();
 
-            System.out.print("Enter your choice : ");
-            choice = scanner.nextInt();
-            scanner.nextLine();
+            if (method.equalsIgnoreCase("POST")) {
 
-            switch (choice) {
+                String formData = new String(
+                        exchange.getRequestBody().readAllBytes(),
+                        StandardCharsets.UTF_8
+                );
 
-                case 1:
-                    addExpense(scanner);
-                    break;
+                String[] pairs = formData.split("&");
 
-                case 2:
-                    viewExpenses();
-                    break;
+                String category = "";
+                double amount = 0;
 
-                case 3:
-                    showTotalExpense();
-                    break;
+                for (String pair : pairs) {
 
-                case 4:
-                    System.out.println("Thank You For Using Expense Tracker");
-                    logger.info("Application Closed");
-                    break;
+                    String[] keyValue = pair.split("=");
 
-                default:
-                    System.out.println("Invalid Choice!");
+                    String key = URLDecoder.decode(keyValue[0], "UTF-8");
+                    String value = URLDecoder.decode(keyValue[1], "UTF-8");
+
+                    if (key.equals("category")) {
+                        category = value;
+                    }
+
+                    if (key.equals("amount")) {
+                        amount = Double.parseDouble(value);
+                    }
+                }
+
+                expenses.add(category + " - Rs " + amount);
+
+                totalExpense += amount;
             }
 
-        } while (choice != 4);
+            StringBuilder expenseList = new StringBuilder();
 
-        scanner.close();
-    }
+            for (String expense : expenses) {
+                expenseList.append("<li>").append(expense).append("</li>");
+            }
 
-    public static void displayMenu() {
+            String response =
+                    "<html>" +
+                    "<head>" +
+                    "<title>Expense Tracker</title>" +
+                    "<style>" +
+                    "body{" +
+                    "font-family:Arial;" +
+                    "background:#f4f4f4;" +
+                    "padding:40px;" +
+                    "}" +
+                    ".container{" +
+                    "background:white;" +
+                    "padding:20px;" +
+                    "border-radius:10px;" +
+                    "width:400px;" +
+                    "margin:auto;" +
+                    "box-shadow:0 0 10px gray;" +
+                    "}" +
+                    "input,select{" +
+                    "width:100%;" +
+                    "padding:10px;" +
+                    "margin-top:10px;" +
+                    "}" +
+                    "button{" +
+                    "padding:10px;" +
+                    "width:100%;" +
+                    "background:maroon;" +
+                    "color:white;" +
+                    "border:none;" +
+                    "margin-top:10px;" +
+                    "}" +
+                    "</style>" +
+                    "</head>" +
+                    "<body>" +
+                    "<div class='container'>" +
+                    "<h1>Daily Expense Tracker</h1>" +
 
-        System.out.println("\n========== MENU ==========");
-        System.out.println("1. Add Expense");
-        System.out.println("2. View Expenses");
-        System.out.println("3. Show Total Expense");
-        System.out.println("4. Exit");
-        System.out.println("==========================");
-    }
+                    "<form method='POST'>" +
 
-    public static void addExpense(Scanner scanner) {
+                    "<label>Category</label>" +
+                    "<select name='category'>" +
+                    "<option>Food</option>" +
+                    "<option>Travel</option>" +
+                    "<option>Shopping</option>" +
+                    "<option>Medical</option>" +
+                    "<option>Entertainment</option>" +
+                    "</select>" +
 
-        System.out.println("\nSelect Expense Category");
-        System.out.println("1. Food");
-        System.out.println("2. Travel");
-        System.out.println("3. Shopping");
-        System.out.println("4. Electricity Bill");
-        System.out.println("5. Internet");
-        System.out.println("6. Entertainment");
-        System.out.println("7. Medical");
-        System.out.println("8. Other");
+                    "<label>Amount</label>" +
+                    "<input type='number' name='amount' required>" +
 
-        System.out.print("Enter category choice : ");
+                    "<button type='submit'>Add Expense</button>" +
 
-        int categoryChoice = scanner.nextInt();
-        scanner.nextLine();
+                    "</form>" +
 
-        String category;
+                    "<h2>Total Expense: Rs " + totalExpense + "</h2>" +
 
-        switch (categoryChoice) {
+                    "<h3>Expense History</h3>" +
+                    "<ul>" +
+                    expenseList +
+                    "</ul>" +
 
-            case 1:
-                category = "Food";
-                break;
+                    "</div>" +
+                    "</body>" +
+                    "</html>";
 
-            case 2:
-                category = "Travel";
-                break;
+            exchange.sendResponseHeaders(200, response.getBytes().length);
 
-            case 3:
-                category = "Shopping";
-                break;
+            OutputStream os = exchange.getResponseBody();
 
-            case 4:
-                category = "Electricity Bill";
-                break;
+            os.write(response.getBytes());
 
-            case 5:
-                category = "Internet";
-                break;
-
-            case 6:
-                category = "Entertainment";
-                break;
-
-            case 7:
-                category = "Medical";
-                break;
-
-            default:
-                category = "Other";
+            os.close();
         }
-
-        System.out.print("Enter Expense Amount : ");
-
-        double amount = scanner.nextDouble();
-        scanner.nextLine();
-
-        if (amount <= 0) {
-
-            logger.error("Invalid amount entered");
-
-            System.out.println("Amount must be greater than zero.");
-            return;
-        }
-
-        String expenseRecord =
-                "Date: " + LocalDate.now()
-                + " | Category: " + category
-                + " | Amount: Rs " + amount;
-
-        expenseList.add(expenseRecord);
-
-        totalExpense += amount;
-
-        logger.info("Expense Added Successfully");
-
-        System.out.println("Expense Added Successfully!");
-    }
-
-    public static void viewExpenses() {
-
-        System.out.println("\n======================================");
-        System.out.println("            EXPENSE LIST");
-        System.out.println("======================================");
-
-        if (expenseList.isEmpty()) {
-
-            System.out.println("No expenses recorded.");
-            return;
-        }
-
-        for (String expense : expenseList) {
-            System.out.println(expense);
-        }
-
-        System.out.println("======================================");
-    }
-
-    public static void showTotalExpense() {
-
-        System.out.println("\n======================================");
-
-        System.out.printf("Total Expense : Rs %.2f%n",
-                totalExpense);
-
-        System.out.println("======================================");
     }
 }
